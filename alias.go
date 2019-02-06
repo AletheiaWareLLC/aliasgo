@@ -18,7 +18,6 @@ package aliasgo
 
 import (
 	"crypto/rsa"
-	"encoding/base64"
 	"errors"
 	"github.com/AletheiaWareLLC/bcgo"
 	"github.com/golang/protobuf/proto"
