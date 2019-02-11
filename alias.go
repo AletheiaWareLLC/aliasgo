@@ -18,9 +18,12 @@ package aliasgo
 
 import (
 	"crypto/rsa"
+	"encoding/base64"
 	"errors"
 	"github.com/AletheiaWareLLC/bcgo"
 	"github.com/golang/protobuf/proto"
+	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -153,4 +156,50 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.Publ
 		SignatureAlgorithm:  signatureAlgorithm,
 	}
 	return record, nil
+}
+
+func RegisterAlias(aliases *bcgo.Channel, alias string, key *rsa.PrivateKey) (string, error) {
+	if err := UniqueAlias(aliases, alias); err != nil {
+		return "", err
+	}
+	publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&key.PublicKey)
+	if err != nil {
+		return "", err
+	}
+	a := &Alias{
+		Alias:        alias,
+		PublicKey:    publicKeyBytes,
+		PublicFormat: bcgo.PublicKeyFormat_PKIX,
+	}
+	data, err := proto.Marshal(a)
+	if err != nil {
+		return "", err
+	}
+
+	signatureAlgorithm := bcgo.SignatureAlgorithm_SHA512WITHRSA_PSS
+
+	signature, err := bcgo.CreateSignature(key, bcgo.Hash(data), signatureAlgorithm)
+	if err != nil {
+		return "", err
+	}
+
+	response, err := http.PostForm(bcgo.BC_WEBSITE+"/alias", url.Values{
+		"alias":              {alias},
+		"publicKey":          {base64.RawURLEncoding.EncodeToString(publicKeyBytes)},
+		"publicKeyFormat":    {"PKIX"},
+		"signature":          {base64.RawURLEncoding.EncodeToString(signature)},
+		"signatureAlgorithm": {signatureAlgorithm.String()},
+	})
+	if err != nil {
+		return "", err
+	}
+	switch response.StatusCode {
+	case http.StatusOK:
+		if err := aliases.Sync(); err != nil {
+			return "", err
+		}
+		return GetAlias(aliases, &key.PublicKey)
+	default:
+		return "", errors.New("Registration status: " + response.Status)
+	}
 }
