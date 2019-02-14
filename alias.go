@@ -32,7 +32,7 @@ const (
 )
 
 func OpenAliasChannel() (*bcgo.Channel, error) {
-	return bcgo.OpenChannel(ALIAS)
+	return bcgo.OpenAndSyncChannel(ALIAS)
 }
 
 func UniqueAlias(a *bcgo.Channel, alias string) error {
