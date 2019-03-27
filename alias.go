@@ -127,6 +127,36 @@ func GetPublicKey(a *bcgo.Channel, alias string) (*rsa.PublicKey, error) {
 	return nil, errors.New("Could not find public key for alias")
 }
 
+func GetAliasRecord(a *bcgo.Channel, alias string) (*bcgo.Record, *Alias, error) {
+	b := a.HeadBlock
+	for b != nil {
+		for _, e := range b.Entry {
+			r := e.Record
+			if r.Creator == alias {
+				a := &Alias{}
+				err := proto.Unmarshal(r.Payload, a)
+				if err != nil {
+					return nil, nil, err
+				}
+				if a.Alias == alias {
+					return r, a, nil
+				}
+			}
+		}
+		h := b.Previous
+		if h != nil && len(h) > 0 {
+			var err error
+			b, err = bcgo.ReadBlockFile(a.Cache, h)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			b = nil
+		}
+	}
+	return nil, nil, errors.New("Could not find public key for alias")
+}
+
 func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.PublicKeyFormat, signature []byte, signatureAlgorithm bcgo.SignatureAlgorithm) (*bcgo.Record, error) {
 	pubKey, err := bcgo.ParseRSAPublicKey(publicKey, publicKeyFormat)
 	if err != nil {
@@ -183,7 +213,7 @@ func RegisterAlias(aliases *bcgo.Channel, alias string, key *rsa.PrivateKey) (st
 		return "", err
 	}
 
-	response, err := http.PostForm(bcgo.BC_WEBSITE+"/alias", url.Values{
+	response, err := http.PostForm(bcgo.BC_WEBSITE+"/alias-register", url.Values{
 		"alias":              {alias},
 		"publicKey":          {base64.RawURLEncoding.EncodeToString(publicKeyBytes)},
 		"publicKeyFormat":    {"PKIX"},
