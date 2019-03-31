@@ -188,7 +188,7 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.Publ
 	return record, nil
 }
 
-func RegisterAlias(aliases *bcgo.Channel, alias string, key *rsa.PrivateKey) (string, error) {
+func RegisterAlias(aliases *bcgo.Channel, host, alias string, key *rsa.PrivateKey) (string, error) {
 	if err := UniqueAlias(aliases, alias); err != nil {
 		return "", err
 	}
@@ -213,7 +213,7 @@ func RegisterAlias(aliases *bcgo.Channel, alias string, key *rsa.PrivateKey) (st
 		return "", err
 	}
 
-	response, err := http.PostForm(bcgo.BC_WEBSITE+"/alias-register", url.Values{
+	response, err := http.PostForm(host+"/alias-register", url.Values{
 		"alias":              {alias},
 		"publicKey":          {base64.RawURLEncoding.EncodeToString(publicKeyBytes)},
 		"publicKeyFormat":    {"PKIX"},
