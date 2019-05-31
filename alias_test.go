@@ -20,80 +20,74 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"github.com/AletheiaWareLLC/aliasgo"
 	"github.com/AletheiaWareLLC/bcgo"
-	"github.com/golang/protobuf/proto"
+	"github.com/AletheiaWareLLC/testinggo"
 	"testing"
 )
 
 // TODO split/move
-func makeAlias(t *testing.T, channel *bcgo.PoWChannel, cache bcgo.Cache, alias string) *rsa.PrivateKey {
+func makeAlias(t *testing.T, cache bcgo.Cache, alias string, previousHash []byte, previousBlock *bcgo.Block) (*rsa.PrivateKey, []byte, *bcgo.Block, *bcgo.Record) {
 	t.Helper()
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		t.Fatalf("Could not get private key: '%s'", err)
-	}
+	testinggo.AssertNoError(t, err)
 
-	publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&privateKey.PublicKey)
-	if err != nil {
-		t.Fatalf("Could not convert public key: '%s'", err)
-	}
+	record, err := aliasgo.CreateSignedAliasRecord(alias, privateKey)
+	testinggo.AssertNoError(t, err)
 
-	a := &aliasgo.Alias{
-		Alias:        alias,
-		PublicKey:    publicKeyBytes,
-		PublicFormat: bcgo.PublicKeyFormat_PKIX,
-	}
-
-	payload, err := proto.Marshal(a)
-	if err != nil {
-		t.Fatalf("Could not marshal payload: '%s'", err)
-	}
-	record := &bcgo.Record{
-		Creator: alias,
-		Payload: payload,
-	}
 	recordHash, err := bcgo.HashProtobuf(record)
-	if err != nil {
-		t.Fatalf("Could not hash record: '%s'", err)
-	}
-	entries := []*bcgo.BlockEntry{
-		&bcgo.BlockEntry{
-			Record:     record,
-			RecordHash: recordHash,
+	testinggo.AssertNoError(t, err)
+
+	block := &bcgo.Block{
+		Entry: []*bcgo.BlockEntry{
+			&bcgo.BlockEntry{
+				Record:     record,
+				RecordHash: recordHash,
+			},
 		},
 	}
-	block := &bcgo.Block{
-		ChannelName: channel.GetName(),
-		Entry:       entries,
+
+	if previousHash != nil {
+		block.Previous = previousHash
+		if previousBlock != nil {
+			block.Length = previousBlock.Length + 1
+		}
 	}
+
 	blockHash, err := bcgo.HashProtobuf(block)
-	if err != nil {
-		t.Fatalf("Could not hash block: '%s'", err)
+	testinggo.AssertNoError(t, err)
+
+	headReference := &bcgo.Reference{
+		ChannelName: aliasgo.ALIAS,
+		BlockHash:   blockHash,
 	}
-	channel.Threshold = 1 // Make it easy
-	if err := bcgo.Update(channel, cache, blockHash, block); err != nil {
-		t.Fatalf("Could not update channel: '%s'", err)
-	}
-	return privateKey
+
+	err = cache.PutHead(aliasgo.ALIAS, headReference)
+	testinggo.AssertNoError(t, err)
+
+	err = cache.PutBlock(blockHash, block)
+	testinggo.AssertNoError(t, err)
+
+	return privateKey, blockHash, block, record
 }
 
 func TestAliasUnique(t *testing.T) {
 	t.Run("Unique", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
 		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
-		err := aliasgo.UniqueAlias(channel, cache, nil, "Alice")
+		err := channel.UniqueAlias(cache, "Alice")
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
 	})
 	t.Run("NotUnique", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
+		makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
-		makeAlias(t, channel, cache, "Alice")
-		err := aliasgo.UniqueAlias(channel, cache, nil, "Alice")
-		if err == nil || err.Error() != aliasgo.ERROR_ALIAS_ALREADY_REGISTERED {
+		err := channel.UniqueAlias(cache, "Alice")
+		if err == nil || err.Error() != fmt.Sprintf(aliasgo.ERROR_ALIAS_ALREADY_REGISTERED, "Alice") {
 			t.Fatalf("Expected error, got '%s'", err)
 		}
 	})
@@ -102,13 +96,13 @@ func TestAliasUnique(t *testing.T) {
 func TestAliasGetAlias(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
+		aliceKey, _, _, _ := makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
-		aliceKey := makeAlias(t, channel, cache, "Alice")
-		alias, err := aliasgo.GetAlias(channel, cache, nil, &aliceKey.PublicKey)
+		alias, err := channel.GetAlias(cache, &aliceKey.PublicKey)
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		if alias != "Alice" {
+		if alias.Alias != "Alice" {
 			t.Fatalf("Incorrect alias; expected 'Alice', got '%s'", alias)
 		}
 	})
@@ -119,7 +113,7 @@ func TestAliasGetAlias(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Could not get private key: '%s'", err)
 		}
-		_, err = aliasgo.GetAlias(channel, cache, nil, &privateKey.PublicKey)
+		_, err = channel.GetAlias(cache, &privateKey.PublicKey)
 		if err == nil || err.Error() != aliasgo.ERROR_ALIAS_NOT_FOUND {
 			t.Fatalf("Expected error, got '%s'", err)
 		}
@@ -129,9 +123,9 @@ func TestAliasGetAlias(t *testing.T) {
 func TestAliasGetPublicKey(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
+		aliceKey, _, _, _ := makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
-		aliceKey := makeAlias(t, channel, cache, "Alice")
-		key, err := aliasgo.GetPublicKey(channel, cache, nil, "Alice")
+		key, err := channel.GetPublicKey(cache, "Alice")
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
@@ -150,7 +144,7 @@ func TestAliasGetPublicKey(t *testing.T) {
 	t.Run("NotExists", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
 		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
-		_, err := aliasgo.GetPublicKey(channel, cache, nil, "Alice")
+		_, err := channel.GetPublicKey(cache, "Alice")
 		if err == nil || err.Error() != aliasgo.ERROR_PUBLIC_KEY_NOT_FOUND {
 			t.Fatalf("Expected error, got '%s'", err)
 		}
@@ -160,14 +154,14 @@ func TestAliasGetPublicKey(t *testing.T) {
 func TestAliasGetAliasRecord(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
+		aliceKey, _, _, aliceRecord := makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
-		aliceKey := makeAlias(t, channel, cache, "Alice")
-		record, alias, err := aliasgo.GetAliasRecord(channel, cache, nil, "Alice")
+		record, alias, err := channel.GetRecord(cache, "Alice")
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		if record.Creator != "Alice" {
-			t.Fatalf("Incorrect creator; expected Alice, got '%s'", record.Creator)
+		if record.String() != aliceRecord.String() {
+			t.Fatalf("Incorrect record; expected '%s', got '%s'", aliceRecord.String(), record.String())
 		}
 		publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&aliceKey.PublicKey)
 		if err != nil {
@@ -180,8 +174,41 @@ func TestAliasGetAliasRecord(t *testing.T) {
 	t.Run("NotExists", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
 		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
-		_, _, err := aliasgo.GetAliasRecord(channel, cache, nil, "Alice")
+		_, _, err := channel.GetRecord(cache, "Alice")
 		if err == nil || err.Error() != aliasgo.ERROR_ALIAS_NOT_FOUND {
+			t.Fatalf("Expected error, got '%s'", err)
+		}
+	})
+}
+
+func TestAliasValidate(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
+		cache := bcgo.NewMemoryCache(1)
+		_, aliceHash, aliceBlock, _ := makeAlias(t, cache, "Alice", nil, nil)
+		_, bobHash, bobBlock, _ := makeAlias(t, cache, "Bob", aliceHash, aliceBlock)
+		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
+		channel.Threshold = 0 // Make it easy
+		err := channel.Validate(cache, aliceHash, aliceBlock)
+		if err != nil {
+			t.Fatalf("Expected no error, got '%s'", err)
+		}
+		err = channel.Validate(cache, bobHash, bobBlock)
+		if err != nil {
+			t.Fatalf("Expected no error, got '%s'", err)
+		}
+	})
+	t.Run("NotValid", func(t *testing.T) {
+		cache := bcgo.NewMemoryCache(1)
+		_, aliceHash1, aliceBlock1, _ := makeAlias(t, cache, "Alice", nil, nil)
+		_, aliceHash2, aliceBlock2, _ := makeAlias(t, cache, "Alice", aliceHash1, aliceBlock1)
+		channel := aliasgo.OpenAndLoadAliasChannel(cache, nil)
+		channel.Threshold = 0 // Make it easy
+		err := channel.Validate(cache, aliceHash1, aliceBlock1)
+		if err != nil {
+			t.Fatalf("Expected no error, got '%s'", err)
+		}
+		err = channel.Validate(cache, aliceHash2, aliceBlock2)
+		if err == nil || err.Error() != fmt.Sprintf(aliasgo.ERROR_ALIAS_ALREADY_REGISTERED, "Alice") {
 			t.Fatalf("Expected error, got '%s'", err)
 		}
 	})

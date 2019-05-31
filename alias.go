@@ -20,165 +20,243 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/AletheiaWareLLC/bcgo"
 	"github.com/golang/protobuf/proto"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
 const (
 	ALIAS = "Alias"
 
-	ERROR_ALIAS_ALREADY_REGISTERED = "Alias already registered"
+	ERROR_ALIAS_ALREADY_REGISTERED = "Alias already registered: %s"
 	ERROR_ALIAS_NOT_FOUND          = "Could not find alias for public key"
 	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could not find public key for alias"
 )
 
-func OpenAndLoadAliasChannel(cache bcgo.Cache, network bcgo.Network) *bcgo.PoWChannel {
-	return bcgo.OpenAndLoadPoWChannel(ALIAS, bcgo.THRESHOLD_STANDARD, cache, network)
+type AliasChannel struct {
+	Name      string
+	Threshold uint64
+	HeadHash  []byte
+	Timestamp uint64
 }
 
-func UniqueAlias(aliases bcgo.ThresholdChannel, cache bcgo.Cache, network bcgo.Network, alias string) error {
-	head := aliases.GetHead()
-	if head != nil {
-		b, err := bcgo.GetBlock(ALIAS, cache, network, head)
-		if err != nil {
-			return err
+func OpenAliasChannel() *AliasChannel {
+	return &AliasChannel{
+		Name:      ALIAS,
+		Threshold: bcgo.THRESHOLD_STANDARD,
+	}
+}
+
+func OpenAndLoadAliasChannel(cache bcgo.Cache, network bcgo.Network) *AliasChannel {
+	c := OpenAliasChannel()
+	if err := bcgo.LoadHead(c, cache, network); err != nil {
+		fmt.Println(err)
+	}
+	return c
+}
+
+func (a *AliasChannel) GetName() string {
+	return a.Name
+}
+
+func (a *AliasChannel) GetThreshold() uint64 {
+	return a.Threshold
+}
+
+func (a *AliasChannel) String() string {
+	return a.Name + " " + strconv.FormatUint(a.Threshold, 10)
+}
+
+func (a *AliasChannel) Validate(cache bcgo.Cache, hash []byte, block *bcgo.Block) error {
+	register := make(map[string]bool)
+	return bcgo.Iterate(hash, block, cache, func(h []byte, b *bcgo.Block) error {
+		// Check hash ones pass threshold
+		ones := bcgo.Ones(h)
+		if ones < a.Threshold {
+			return errors.New(fmt.Sprintf(bcgo.ERROR_HASH_TOO_WEAK, ones, a.Threshold))
 		}
-		for b != nil {
-			for _, e := range b.Entry {
-				r := e.Record
-				if r.Creator == alias {
-					a := &Alias{}
-					err := proto.Unmarshal(r.Payload, a)
-					if err != nil {
-						return err
-					}
-					if a.Alias == alias {
-						return errors.New(ERROR_ALIAS_ALREADY_REGISTERED)
-					}
-				}
+		for _, entry := range b.Entry {
+			record := entry.Record
+			// TODO Check record is public (no acl)
+			a := &Alias{}
+			err := proto.Unmarshal(record.Payload, a)
+			if err != nil {
+				return err
 			}
-			h := b.Previous
-			if h != nil && len(h) > 0 {
-				b, err = bcgo.GetBlock(ALIAS, cache, network, h)
+			v, exists := register[a.Alias]
+			if exists || v {
+				return errors.New(fmt.Sprintf(ERROR_ALIAS_ALREADY_REGISTERED, a.Alias))
+			}
+			fmt.Printf("Validated '%s'\n", a.Alias)
+			register[a.Alias] = true
+		}
+		return nil
+	})
+}
+
+func (a *AliasChannel) GetHead() []byte {
+	return a.HeadHash
+}
+
+func (a *AliasChannel) SetHead(hash []byte) {
+	a.HeadHash = hash
+}
+
+func (a *AliasChannel) GetTimestamp() uint64 {
+	return a.Timestamp
+}
+
+func (a *AliasChannel) SetTimestamp(Timestamp uint64) {
+	a.Timestamp = Timestamp
+}
+
+func (a *AliasChannel) UniqueAlias(cache bcgo.Cache, alias string) error {
+	return bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+		for _, entry := range block.Entry {
+			record := entry.Record
+			if record.Creator == alias {
+				a := &Alias{}
+				err := proto.Unmarshal(record.Payload, a)
 				if err != nil {
 					return err
 				}
-			} else {
-				b = nil
+				if a.Alias == alias {
+					return errors.New(fmt.Sprintf(ERROR_ALIAS_ALREADY_REGISTERED, alias))
+				}
 			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
-func GetAlias(aliases bcgo.ThresholdChannel, cache bcgo.Cache, network bcgo.Network, publicKey *rsa.PublicKey) (string, error) {
-	head := aliases.GetHead()
-	if head != nil {
-		b, err := bcgo.GetBlock(ALIAS, cache, network, head)
-		if err != nil {
-			return "", err
-		}
-		for b != nil {
-			for _, e := range b.Entry {
-				r := e.Record
-				a := &Alias{}
-				err := proto.Unmarshal(r.Payload, a)
-				if err != nil {
-					return "", err
-				}
-				pk, err := bcgo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
-				if err != nil {
-					return "", err
-				}
-				if publicKey.N.Cmp(pk.N) == 0 && publicKey.E == pk.E {
-					return a.Alias, nil
-				}
+func (a *AliasChannel) GetAlias(cache bcgo.Cache, publicKey *rsa.PublicKey) (*Alias, error) {
+	var result *Alias
+	if err := bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+		for _, entry := range block.Entry {
+			record := entry.Record
+			a := &Alias{}
+			err := proto.Unmarshal(record.Payload, a)
+			if err != nil {
+				return err
 			}
-			h := b.Previous
-			if h != nil && len(h) > 0 {
-				b, err = bcgo.GetBlock(ALIAS, cache, network, h)
-				if err != nil {
-					return "", err
-				}
-			} else {
-				b = nil
+			pk, err := bcgo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
+			if err != nil {
+				return err
+			}
+			if publicKey.N.Cmp(pk.N) == 0 && publicKey.E == pk.E {
+				result = a
+				return bcgo.StopIterationError{}
 			}
 		}
-	}
-	return "", errors.New(ERROR_ALIAS_NOT_FOUND)
-}
-
-func GetPublicKey(aliases bcgo.ThresholdChannel, cache bcgo.Cache, network bcgo.Network, alias string) (*rsa.PublicKey, error) {
-	head := aliases.GetHead()
-	if head != nil {
-		b, err := bcgo.GetBlock(ALIAS, cache, network, head)
-		if err != nil {
+		return nil
+	}); err != nil {
+		switch err.(type) {
+		case bcgo.StopIterationError:
+			// Do nothing
+			break
+		default:
 			return nil, err
 		}
-		for b != nil {
-			for _, e := range b.Entry {
-				r := e.Record
-				if r.Creator == alias {
-					a := &Alias{}
-					err := proto.Unmarshal(r.Payload, a)
-					if err != nil {
-						return nil, err
-					}
-					if a.Alias == alias {
-						return bcgo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
-					}
-				}
-			}
-			h := b.Previous
-			if h != nil && len(h) > 0 {
-				b, err = bcgo.GetBlock(ALIAS, cache, network, h)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				b = nil
-			}
-		}
 	}
-	return nil, errors.New(ERROR_PUBLIC_KEY_NOT_FOUND)
+	if result == nil {
+		return nil, errors.New(ERROR_ALIAS_NOT_FOUND)
+	}
+	return result, nil
 }
 
-func GetAliasRecord(aliases bcgo.ThresholdChannel, cache bcgo.Cache, network bcgo.Network, alias string) (*bcgo.Record, *Alias, error) {
-	head := aliases.GetHead()
-	if head != nil {
-		b, err := bcgo.GetBlock(ALIAS, cache, network, head)
-		if err != nil {
-			return nil, nil, err
-		}
-		for b != nil {
-			for _, e := range b.Entry {
-				r := e.Record
-				if r.Creator == alias {
-					a := &Alias{}
-					err := proto.Unmarshal(r.Payload, a)
-					if err != nil {
-						return nil, nil, err
-					}
-					if a.Alias == alias {
-						return r, a, nil
-					}
-				}
+func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, alias string) (*rsa.PublicKey, error) {
+	var result *rsa.PublicKey
+	if err := bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+		for _, entry := range block.Entry {
+			record := entry.Record
+			a := &Alias{}
+			err := proto.Unmarshal(record.Payload, a)
+			if err != nil {
+				return err
 			}
-			h := b.Previous
-			if h != nil && len(h) > 0 {
-				b, err = bcgo.GetBlock(ALIAS, cache, network, h)
+			if a.Alias == alias {
+				result, err = bcgo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
 				if err != nil {
-					return nil, nil, err
+					return err
 				}
-			} else {
-				b = nil
+				return bcgo.StopIterationError{}
 			}
+		}
+		return nil
+	}); err != nil {
+		switch err.(type) {
+		case bcgo.StopIterationError:
+			// Do nothing
+			break
+		default:
+			return nil, err
 		}
 	}
-	return nil, nil, errors.New(ERROR_ALIAS_NOT_FOUND)
+	if result == nil {
+		return nil, errors.New(ERROR_PUBLIC_KEY_NOT_FOUND)
+	}
+	return result, nil
+}
+
+func (a *AliasChannel) GetRecord(cache bcgo.Cache, alias string) (*bcgo.Record, *Alias, error) {
+	var recordResult *bcgo.Record
+	var aliasResult *Alias
+	if err := bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+		for _, entry := range block.Entry {
+			record := entry.Record
+			if record.Creator == alias {
+				recordResult = record
+				aliasResult = &Alias{}
+				err := proto.Unmarshal(record.Payload, aliasResult)
+				if err != nil {
+					return err
+				}
+				return bcgo.StopIterationError{}
+			}
+		}
+		return nil
+	}); err != nil {
+		switch err.(type) {
+		case bcgo.StopIterationError:
+			// Do nothing
+			break
+		default:
+			return nil, nil, err
+		}
+	}
+	if recordResult == nil || aliasResult == nil {
+		return nil, nil, errors.New(ERROR_ALIAS_NOT_FOUND)
+	}
+	return recordResult, aliasResult, nil
+}
+
+func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Record, error) {
+	publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&privateKey.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKeyFormat := bcgo.PublicKeyFormat_PKIX
+	hash, err := bcgo.HashProtobuf(&Alias{
+		Alias:        alias,
+		PublicKey:    publicKeyBytes,
+		PublicFormat: publicKeyFormat,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	signatureAlgorithm := bcgo.SignatureAlgorithm_SHA512WITHRSA_PSS
+	signature, err := bcgo.CreateSignature(privateKey, hash, signatureAlgorithm)
+	if err != nil {
+		return nil, err
+	}
+
+	return CreateAliasRecord(alias, publicKeyBytes, publicKeyFormat, signature, signatureAlgorithm)
 }
 
 func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.PublicKeyFormat, signature []byte, signatureAlgorithm bcgo.SignatureAlgorithm) (*bcgo.Record, error) {
