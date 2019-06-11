@@ -51,9 +51,9 @@ func OpenAliasChannel() *AliasChannel {
 	}
 }
 
-func OpenAndLoadAliasChannel(cache bcgo.Cache, network bcgo.Network) *AliasChannel {
+func OpenAndPullAliasChannel(cache bcgo.Cache, network bcgo.Network) *AliasChannel {
 	c := OpenAliasChannel()
-	if err := bcgo.LoadHead(c, cache, network); err != nil {
+	if err := bcgo.Pull(c, cache, network); err != nil {
 		fmt.Println(err)
 	}
 	return c
