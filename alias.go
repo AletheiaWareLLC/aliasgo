@@ -63,9 +63,9 @@ func (a *AliasChannel) String() string {
 	return a.Name + " " + strconv.FormatUint(a.Threshold, 10)
 }
 
-func (a *AliasChannel) Validate(cache bcgo.Cache, hash []byte, block *bcgo.Block) error {
+func (a *AliasChannel) Validate(cache bcgo.Cache, network bcgo.Network, hash []byte, block *bcgo.Block) error {
 	register := make(map[string]bool)
-	return bcgo.Iterate(hash, block, cache, func(h []byte, b *bcgo.Block) error {
+	return bcgo.Iterate(a.Name, hash, block, cache, network, func(h []byte, b *bcgo.Block) error {
 		// Check hash ones pass threshold
 		ones := bcgo.Ones(h)
 		if ones < a.Threshold {
@@ -106,8 +106,8 @@ func (a *AliasChannel) SetTimestamp(Timestamp uint64) {
 	a.Timestamp = Timestamp
 }
 
-func (a *AliasChannel) UniqueAlias(cache bcgo.Cache, alias string) error {
-	return bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+func (a *AliasChannel) UniqueAlias(cache bcgo.Cache, network bcgo.Network, alias string) error {
+	return bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			if record.Creator == alias {
@@ -125,9 +125,9 @@ func (a *AliasChannel) UniqueAlias(cache bcgo.Cache, alias string) error {
 	})
 }
 
-func (a *AliasChannel) GetAlias(cache bcgo.Cache, publicKey *rsa.PublicKey) (*Alias, error) {
+func (a *AliasChannel) GetAlias(cache bcgo.Cache, network bcgo.Network, publicKey *rsa.PublicKey) (*Alias, error) {
 	var result *Alias
-	if err := bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			a := &Alias{}
@@ -160,9 +160,9 @@ func (a *AliasChannel) GetAlias(cache bcgo.Cache, publicKey *rsa.PublicKey) (*Al
 	return result, nil
 }
 
-func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, alias string) (*rsa.PublicKey, error) {
+func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, network bcgo.Network, alias string) (*rsa.PublicKey, error) {
 	var result *rsa.PublicKey
-	if err := bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			a := &Alias{}
@@ -194,10 +194,10 @@ func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, alias string) (*rsa.Public
 	return result, nil
 }
 
-func (a *AliasChannel) GetRecord(cache bcgo.Cache, alias string) (*bcgo.Record, *Alias, error) {
+func (a *AliasChannel) GetRecord(cache bcgo.Cache, network bcgo.Network, alias string) (*bcgo.Record, *Alias, error) {
 	var recordResult *bcgo.Record
 	var aliasResult *Alias
-	if err := bcgo.Iterate(a.GetHead(), nil, cache, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			if record.Creator == alias {
