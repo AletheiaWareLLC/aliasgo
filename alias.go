@@ -32,9 +32,12 @@ import (
 const (
 	ALIAS = "Alias"
 
+	MAX_ALIAS_LENGTH = 100
+
 	ERROR_ALIAS_ALREADY_REGISTERED = "Alias already registered: %s"
 	ERROR_ALIAS_NOT_FOUND          = "Could not find alias for public key"
 	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could not find public key for alias"
+	ERROR_ALIAS_TOO_LONG           = "Alias too long: %d max: %d"
 )
 
 type AliasChannel struct {
@@ -78,6 +81,10 @@ func (a *AliasChannel) Validate(cache bcgo.Cache, network bcgo.Network, hash []b
 			err := proto.Unmarshal(record.Payload, a)
 			if err != nil {
 				return err
+			}
+			length := len(a.Alias)
+			if length > MAX_ALIAS_LENGTH {
+				return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
 			}
 			v, exists := register[a.Alias]
 			if exists || v {
@@ -227,6 +234,11 @@ func (a *AliasChannel) GetRecord(cache bcgo.Cache, network bcgo.Network, alias s
 }
 
 func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Record, error) {
+	length := len(alias)
+	if length > MAX_ALIAS_LENGTH {
+		return nil, errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+	}
+
 	publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&privateKey.PublicKey)
 	if err != nil {
 		return nil, err
@@ -252,6 +264,11 @@ func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Re
 }
 
 func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.PublicKeyFormat, signature []byte, signatureAlgorithm bcgo.SignatureAlgorithm) (*bcgo.Record, error) {
+	length := len(alias)
+	if length > MAX_ALIAS_LENGTH {
+		return nil, errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+	}
+
 	pubKey, err := bcgo.ParseRSAPublicKey(publicKey, publicKeyFormat)
 	if err != nil {
 		return nil, err
@@ -283,6 +300,11 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.Publ
 }
 
 func RegisterAlias(host, alias string, key *rsa.PrivateKey) error {
+	length := len(alias)
+	if length > MAX_ALIAS_LENGTH {
+		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+	}
+
 	publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&key.PublicKey)
 	if err != nil {
 		return err
