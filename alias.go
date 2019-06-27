@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/AletheiaWareLLC/bcgo"
 	"github.com/golang/protobuf/proto"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -231,6 +232,51 @@ func (a *AliasChannel) GetRecord(cache bcgo.Cache, network bcgo.Network, alias s
 		return nil, nil, errors.New(ERROR_ALIAS_NOT_FOUND)
 	}
 	return recordResult, aliasResult, nil
+}
+
+func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
+	// Open Alias Channel
+	aliases := OpenAliasChannel()
+	// Update Alias Channel
+	if err := bcgo.LoadHead(aliases, node.Cache, node.Network); err != nil {
+		log.Println(err)
+	} else if err := bcgo.Pull(aliases, node.Cache, node.Network); err != nil {
+		log.Println(err)
+	}
+	// Check Alias is unique
+	if err := aliases.UniqueAlias(node.Cache, node.Network, node.Alias); err != nil {
+		return err
+	}
+	// Register Alias
+	if err := RegisterAlias(bcgo.GetBCWebsite(), node.Alias, node.Key); err != nil {
+		log.Println("Could not register alias remotely: ", err)
+		log.Println("Registering locally")
+		// Create record
+		record, err := CreateSignedAliasRecord(node.Alias, node.Key)
+		if err != nil {
+			return err
+		}
+
+		// Write record to cache
+		reference, err := bcgo.WriteRecord(ALIAS, node.Cache, record)
+		if err != nil {
+			return err
+		}
+		log.Println("Wrote Record", base64.RawURLEncoding.EncodeToString(reference.RecordHash))
+
+		// Mine record into blockchain
+		hash, _, err := node.Mine(aliases, listener)
+		if err != nil {
+			return err
+		}
+		log.Println("Mined Alias", base64.RawURLEncoding.EncodeToString(hash))
+
+		// Push update to peers
+		if err := bcgo.Push(aliases, node.Cache, node.Network); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Record, error) {
