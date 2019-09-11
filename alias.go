@@ -249,7 +249,7 @@ func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 	}
 	// Register Alias
 	if err := RegisterAlias(bcgo.GetBCWebsite(), node.Alias, node.Key); err != nil {
-		log.Println("Could not register alias remotely: ", err)
+		log.Println("Could not register alias remotely:", err)
 		log.Println("Registering locally")
 		// Create record
 		record, err := CreateSignedAliasRecord(node.Alias, node.Key)
