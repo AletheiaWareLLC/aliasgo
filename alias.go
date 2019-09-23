@@ -202,6 +202,32 @@ func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, network bcgo.Network, alia
 	return result, nil
 }
 
+func (a *AliasChannel) GetPublicKeys(cache bcgo.Cache, network bcgo.Network, addresses []string) map[string]*rsa.PublicKey {
+	acl := make(map[string]*rsa.PublicKey)
+	if len(addresses) > 0 {
+		alias := &Alias{}
+		bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+			for _, entry := range block.Entry {
+				err := proto.Unmarshal(entry.Record.Payload, alias)
+				if err != nil {
+					return err
+				}
+				for _, address := range addresses {
+					if alias.Alias == address {
+						publicKey, err := bcgo.ParseRSAPublicKey(alias.PublicKey, alias.PublicFormat)
+						if err != nil {
+							return err
+						}
+						acl[address] = publicKey
+					}
+				}
+			}
+			return nil
+		})
+	}
+	return acl
+}
+
 func (a *AliasChannel) GetRecord(cache bcgo.Cache, network bcgo.Network, alias string) (*bcgo.Record, *Alias, error) {
 	var recordResult *bcgo.Record
 	var aliasResult *Alias
