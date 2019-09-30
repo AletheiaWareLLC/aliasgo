@@ -264,9 +264,10 @@ func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 	// Open Alias Channel
 	aliases := OpenAliasChannel()
 	// Update Alias Channel
-	if err := bcgo.LoadHead(aliases, node.Cache, node.Network); err != nil {
+	if err := bcgo.LoadCachedHead(aliases, node.Cache); err != nil {
 		log.Println(err)
-	} else if err := bcgo.Pull(aliases, node.Cache, node.Network); err != nil {
+	}
+	if err := bcgo.Pull(aliases, node.Cache, node.Network); err != nil {
 		log.Println(err)
 	}
 	// Check Alias is unique
