@@ -27,11 +27,12 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 )
 
 const (
 	ALIAS = "Alias"
+
+	ALIAS_THRESHOLD = bcgo.THRESHOLD_STANDARD
 
 	MAX_ALIAS_LENGTH = 100
 
@@ -41,81 +42,20 @@ const (
 	ERROR_ALIAS_TOO_LONG           = "Alias too long: %d max: %d"
 )
 
-type AliasChannel struct {
-	Name      string
-	Threshold uint64
-	HeadHash  []byte
-	Timestamp uint64
-}
-
-func OpenAliasChannel() *AliasChannel {
-	return &AliasChannel{
-		Name:      ALIAS,
-		Threshold: bcgo.THRESHOLD_STANDARD,
+func OpenAliasChannel() *bcgo.Channel {
+	return &bcgo.Channel{
+		Name: ALIAS,
+		Validators: []bcgo.Validator{
+			&bcgo.PoWValidator{
+				Threshold: ALIAS_THRESHOLD,
+			},
+			&AliasValidator{},
+		},
 	}
 }
 
-func (a *AliasChannel) GetName() string {
-	return a.Name
-}
-
-func (a *AliasChannel) GetThreshold() uint64 {
-	return a.Threshold
-}
-
-func (a *AliasChannel) String() string {
-	return a.Name + " " + strconv.FormatUint(a.Threshold, 10)
-}
-
-func (a *AliasChannel) Validate(cache bcgo.Cache, network bcgo.Network, hash []byte, block *bcgo.Block) error {
-	register := make(map[string]bool)
-	return bcgo.Iterate(a.Name, hash, block, cache, network, func(h []byte, b *bcgo.Block) error {
-		// Check hash ones pass threshold
-		ones := bcgo.Ones(h)
-		if ones < a.Threshold {
-			return errors.New(fmt.Sprintf(bcgo.ERROR_HASH_TOO_WEAK, ones, a.Threshold))
-		}
-		for _, entry := range b.Entry {
-			record := entry.Record
-			// TODO Check record is public (no acl)
-			a := &Alias{}
-			err := proto.Unmarshal(record.Payload, a)
-			if err != nil {
-				return err
-			}
-			length := len(a.Alias)
-			if length > MAX_ALIAS_LENGTH {
-				return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
-			}
-			v, exists := register[a.Alias]
-			if exists || v {
-				return errors.New(fmt.Sprintf(ERROR_ALIAS_ALREADY_REGISTERED, a.Alias))
-			}
-			fmt.Printf("Validated '%s'\n", a.Alias)
-			register[a.Alias] = true
-		}
-		return nil
-	})
-}
-
-func (a *AliasChannel) GetHead() []byte {
-	return a.HeadHash
-}
-
-func (a *AliasChannel) SetHead(hash []byte) {
-	a.HeadHash = hash
-}
-
-func (a *AliasChannel) GetTimestamp() uint64 {
-	return a.Timestamp
-}
-
-func (a *AliasChannel) SetTimestamp(Timestamp uint64) {
-	a.Timestamp = Timestamp
-}
-
-func (a *AliasChannel) UniqueAlias(cache bcgo.Cache, network bcgo.Network, alias string) error {
-	return bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+func UniqueAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) error {
+	return bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			if record.Creator == alias {
@@ -133,9 +73,9 @@ func (a *AliasChannel) UniqueAlias(cache bcgo.Cache, network bcgo.Network, alias
 	})
 }
 
-func (a *AliasChannel) GetAlias(cache bcgo.Cache, network bcgo.Network, publicKey *rsa.PublicKey) (*Alias, error) {
+func GetAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, publicKey *rsa.PublicKey) (*Alias, error) {
 	var result *Alias
-	if err := bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			a := &Alias{}
@@ -168,9 +108,9 @@ func (a *AliasChannel) GetAlias(cache bcgo.Cache, network bcgo.Network, publicKe
 	return result, nil
 }
 
-func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, network bcgo.Network, alias string) (*rsa.PublicKey, error) {
+func GetPublicKey(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) (*rsa.PublicKey, error) {
 	var result *rsa.PublicKey
-	if err := bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			a := &Alias{}
@@ -202,11 +142,11 @@ func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, network bcgo.Network, alia
 	return result, nil
 }
 
-func (a *AliasChannel) GetPublicKeys(cache bcgo.Cache, network bcgo.Network, addresses []string) map[string]*rsa.PublicKey {
+func GetPublicKeys(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, addresses []string) map[string]*rsa.PublicKey {
 	acl := make(map[string]*rsa.PublicKey)
 	if len(addresses) > 0 {
 		alias := &Alias{}
-		bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+		bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 			for _, entry := range block.Entry {
 				err := proto.Unmarshal(entry.Record.Payload, alias)
 				if err != nil {
@@ -228,10 +168,10 @@ func (a *AliasChannel) GetPublicKeys(cache bcgo.Cache, network bcgo.Network, add
 	return acl
 }
 
-func (a *AliasChannel) GetRecord(cache bcgo.Cache, network bcgo.Network, alias string) (*bcgo.Record, *Alias, error) {
+func GetRecord(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) (*bcgo.Record, *Alias, error) {
 	var recordResult *bcgo.Record
 	var aliasResult *Alias
-	if err := bcgo.Iterate(a.Name, a.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			if record.Creator == alias {
@@ -260,18 +200,47 @@ func (a *AliasChannel) GetRecord(cache bcgo.Cache, network bcgo.Network, alias s
 	return recordResult, aliasResult, nil
 }
 
+type AliasValidator struct {
+}
+
+func (a *AliasValidator) Validate(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, hash []byte, block *bcgo.Block) error {
+	register := make(map[string]bool)
+	return bcgo.Iterate(channel.GetName(), hash, block, cache, network, func(h []byte, b *bcgo.Block) error {
+		for _, entry := range b.Entry {
+			record := entry.Record
+			// TODO Check record is public (no acl)
+			a := &Alias{}
+			err := proto.Unmarshal(record.Payload, a)
+			if err != nil {
+				return err
+			}
+			length := len(a.Alias)
+			if length > MAX_ALIAS_LENGTH {
+				return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+			}
+			v, exists := register[a.Alias]
+			if exists || v {
+				return errors.New(fmt.Sprintf(ERROR_ALIAS_ALREADY_REGISTERED, a.Alias))
+			}
+			fmt.Printf("Validated '%s'\n", a.Alias)
+			register[a.Alias] = true
+		}
+		return nil
+	})
+}
+
 func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 	// Open Alias Channel
 	aliases := OpenAliasChannel()
 	// Update Alias Channel
-	if err := bcgo.LoadCachedHead(aliases, node.Cache); err != nil {
+	if err := aliases.LoadCachedHead(node.Cache); err != nil {
 		log.Println(err)
 	}
-	if err := bcgo.Pull(aliases, node.Cache, node.Network); err != nil {
+	if err := aliases.Pull(node.Cache, node.Network); err != nil {
 		log.Println(err)
 	}
 	// Check Alias is unique
-	if err := aliases.UniqueAlias(node.Cache, node.Network, node.Alias); err != nil {
+	if err := UniqueAlias(aliases, node.Cache, node.Network, node.Alias); err != nil {
 		return err
 	}
 	// Register Alias
@@ -292,14 +261,14 @@ func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 		log.Println("Wrote Record", base64.RawURLEncoding.EncodeToString(reference.RecordHash))
 
 		// Mine record into blockchain
-		hash, _, err := node.Mine(aliases, listener)
+		hash, _, err := node.Mine(aliases, ALIAS_THRESHOLD, listener)
 		if err != nil {
 			return err
 		}
 		log.Println("Mined Alias", base64.RawURLEncoding.EncodeToString(hash))
 
 		// Push update to peers
-		if err := bcgo.Push(aliases, node.Cache, node.Network); err != nil {
+		if err := aliases.Push(node.Cache, node.Network); err != nil {
 			return err
 		}
 	}
