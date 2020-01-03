@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/AletheiaWareLLC/bcgo"
+	"github.com/AletheiaWareLLC/cryptogo"
 	"github.com/golang/protobuf/proto"
 	"log"
 	"net/http"
@@ -143,7 +144,7 @@ func (a *AliasChannel) GetAlias(cache bcgo.Cache, network bcgo.Network, publicKe
 			if err != nil {
 				return err
 			}
-			pk, err := bcgo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
+			pk, err := cryptogo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
 			if err != nil {
 				return err
 			}
@@ -179,7 +180,7 @@ func (a *AliasChannel) GetPublicKey(cache bcgo.Cache, network bcgo.Network, alia
 				return err
 			}
 			if a.Alias == alias {
-				result, err = bcgo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
+				result, err = cryptogo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
 				if err != nil {
 					return err
 				}
@@ -214,7 +215,7 @@ func (a *AliasChannel) GetPublicKeys(cache bcgo.Cache, network bcgo.Network, add
 				}
 				for _, address := range addresses {
 					if alias.Alias == address {
-						publicKey, err := bcgo.ParseRSAPublicKey(alias.PublicKey, alias.PublicFormat)
+						publicKey, err := cryptogo.ParseRSAPublicKey(alias.PublicKey, alias.PublicFormat)
 						if err != nil {
 							return err
 						}
@@ -312,13 +313,13 @@ func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Re
 		return nil, errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
 	}
 
-	publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&privateKey.PublicKey)
+	publicKeyBytes, err := cryptogo.RSAPublicKeyToPKIXBytes(&privateKey.PublicKey)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKeyFormat := bcgo.PublicKeyFormat_PKIX
-	hash, err := bcgo.HashProtobuf(&Alias{
+	publicKeyFormat := cryptogo.PublicKeyFormat_PKIX
+	hash, err := cryptogo.HashProtobuf(&Alias{
 		Alias:        alias,
 		PublicKey:    publicKeyBytes,
 		PublicFormat: publicKeyFormat,
@@ -327,8 +328,8 @@ func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Re
 		return nil, err
 	}
 
-	signatureAlgorithm := bcgo.SignatureAlgorithm_SHA512WITHRSA_PSS
-	signature, err := bcgo.CreateSignature(privateKey, hash, signatureAlgorithm)
+	signatureAlgorithm := cryptogo.SignatureAlgorithm_SHA512WITHRSA_PSS
+	signature, err := cryptogo.CreateSignature(privateKey, hash, signatureAlgorithm)
 	if err != nil {
 		return nil, err
 	}
@@ -336,13 +337,13 @@ func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Re
 	return CreateAliasRecord(alias, publicKeyBytes, publicKeyFormat, signature, signatureAlgorithm)
 }
 
-func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.PublicKeyFormat, signature []byte, signatureAlgorithm bcgo.SignatureAlgorithm) (*bcgo.Record, error) {
+func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat cryptogo.PublicKeyFormat, signature []byte, signatureAlgorithm cryptogo.SignatureAlgorithm) (*bcgo.Record, error) {
 	length := len(alias)
 	if length > MAX_ALIAS_LENGTH {
 		return nil, errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
 	}
 
-	pubKey, err := bcgo.ParseRSAPublicKey(publicKey, publicKeyFormat)
+	pubKey, err := cryptogo.ParseRSAPublicKey(publicKey, publicKeyFormat)
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +358,7 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.Publ
 		return nil, err
 	}
 
-	if err := bcgo.VerifySignature(pubKey, bcgo.Hash(data), signature, signatureAlgorithm); err != nil {
+	if err := cryptogo.VerifySignature(pubKey, cryptogo.Hash(data), signature, signatureAlgorithm); err != nil {
 		return nil, err
 	}
 
@@ -365,7 +366,7 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat bcgo.Publ
 		Timestamp:           uint64(time.Now().UnixNano()),
 		Creator:             alias,
 		Payload:             data,
-		EncryptionAlgorithm: bcgo.EncryptionAlgorithm_UNKNOWN_ENCRYPTION,
+		EncryptionAlgorithm: cryptogo.EncryptionAlgorithm_UNKNOWN_ENCRYPTION,
 		Signature:           signature,
 		SignatureAlgorithm:  signatureAlgorithm,
 	}
@@ -378,7 +379,7 @@ func RegisterAlias(host, alias string, key *rsa.PrivateKey) error {
 		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
 	}
 
-	publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&key.PublicKey)
+	publicKeyBytes, err := cryptogo.RSAPublicKeyToPKIXBytes(&key.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -386,15 +387,15 @@ func RegisterAlias(host, alias string, key *rsa.PrivateKey) error {
 	data, err := proto.Marshal(&Alias{
 		Alias:        alias,
 		PublicKey:    publicKeyBytes,
-		PublicFormat: bcgo.PublicKeyFormat_PKIX,
+		PublicFormat: cryptogo.PublicKeyFormat_PKIX,
 	})
 	if err != nil {
 		return err
 	}
 
-	signatureAlgorithm := bcgo.SignatureAlgorithm_SHA512WITHRSA_PSS
+	signatureAlgorithm := cryptogo.SignatureAlgorithm_SHA512WITHRSA_PSS
 
-	signature, err := bcgo.CreateSignature(key, bcgo.Hash(data), signatureAlgorithm)
+	signature, err := cryptogo.CreateSignature(key, cryptogo.Hash(data), signatureAlgorithm)
 	if err != nil {
 		return err
 	}

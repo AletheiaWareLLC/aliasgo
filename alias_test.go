@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/AletheiaWareLLC/aliasgo"
 	"github.com/AletheiaWareLLC/bcgo"
+	"github.com/AletheiaWareLLC/cryptogo"
 	"github.com/AletheiaWareLLC/testinggo"
 	"testing"
 )
@@ -37,7 +38,7 @@ func makeAlias(t *testing.T, cache bcgo.Cache, alias string, previousHash []byte
 	record, err := aliasgo.CreateSignedAliasRecord(alias, privateKey)
 	testinggo.AssertNoError(t, err)
 
-	recordHash, err := bcgo.HashProtobuf(record)
+	recordHash, err := cryptogo.HashProtobuf(record)
 	testinggo.AssertNoError(t, err)
 
 	block := &bcgo.Block{
@@ -56,7 +57,7 @@ func makeAlias(t *testing.T, cache bcgo.Cache, alias string, previousHash []byte
 		}
 	}
 
-	blockHash, err := bcgo.HashProtobuf(block)
+	blockHash, err := cryptogo.HashProtobuf(block)
 	testinggo.AssertNoError(t, err)
 
 	headReference := &bcgo.Reference{
@@ -136,11 +137,11 @@ func TestAliasGetPublicKey(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		keyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(key)
+		keyBytes, err := cryptogo.RSAPublicKeyToPKIXBytes(key)
 		if err != nil {
 			t.Fatalf("Could not convert public key: '%s'", err)
 		}
-		publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&aliceKey.PublicKey)
+		publicKeyBytes, err := cryptogo.RSAPublicKeyToPKIXBytes(&aliceKey.PublicKey)
 		if err != nil {
 			t.Fatalf("Could not convert public key: '%s'", err)
 		}
@@ -173,7 +174,7 @@ func TestAliasGetAliasRecord(t *testing.T) {
 		if record.String() != aliceRecord.String() {
 			t.Fatalf("Incorrect record; expected '%s', got '%s'", aliceRecord.String(), record.String())
 		}
-		publicKeyBytes, err := bcgo.RSAPublicKeyToPKIXBytes(&aliceKey.PublicKey)
+		publicKeyBytes, err := cryptogo.RSAPublicKeyToPKIXBytes(&aliceKey.PublicKey)
 		if err != nil {
 			t.Fatalf("Could not convert public key: '%s'", err)
 		}
