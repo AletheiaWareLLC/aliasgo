@@ -28,7 +28,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 )
 
 const (
@@ -363,7 +362,7 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat cryptogo.
 	}
 
 	record := &bcgo.Record{
-		Timestamp:           uint64(time.Now().UnixNano()),
+		Timestamp:           bcgo.Timestamp(),
 		Creator:             alias,
 		Payload:             data,
 		EncryptionAlgorithm: cryptogo.EncryptionAlgorithm_UNKNOWN_ENCRYPTION,
