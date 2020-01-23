@@ -192,7 +192,7 @@ func TestAliasGetAliasRecord(t *testing.T) {
 	})
 }
 
-func TestAliasValidate(t *testing.T) {
+func TestAliasValidator(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
 		_, aliceHash, aliceBlock, _ := makeAlias(t, cache, "Alice", nil, nil)
@@ -228,6 +228,15 @@ func TestAliasValidate(t *testing.T) {
 		if err := validator.Validate(channel, cache, nil, aliceHash2, aliceBlock2); err == nil || err.Error() != fmt.Sprintf(aliasgo.ERROR_ALIAS_ALREADY_REGISTERED, "Alice") {
 			t.Fatalf("Expected error, got '%s'", err)
 		}
+	})
+}
+
+func TestAliasValidate(t *testing.T) {
+	t.Run("Valid", func(t *testing.T) {
+		testinggo.AssertNoError(t, aliasgo.ValidateAlias("foobar"))
+	})
+	t.Run("NotValid", func(t *testing.T) {
+		testinggo.AssertError(t, aliasgo.ERROR_ALIAS_CONTAINS_WHITESPACE, aliasgo.ValidateAlias("foo bar"))
 	})
 }
 

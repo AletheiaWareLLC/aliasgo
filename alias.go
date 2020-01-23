@@ -27,6 +27,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
+	"unicode"
 )
 
 const (
@@ -36,10 +38,11 @@ const (
 
 	MAX_ALIAS_LENGTH = 100
 
-	ERROR_ALIAS_ALREADY_REGISTERED = "Alias already registered: %s"
-	ERROR_ALIAS_NOT_FOUND          = "Could not find alias for public key"
-	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could not find public key for alias"
-	ERROR_ALIAS_TOO_LONG           = "Alias too long: %d max: %d"
+	ERROR_ALIAS_ALREADY_REGISTERED  = "Alias already registered: %s"
+	ERROR_ALIAS_CONTAINS_WHITESPACE = "Alias contains whitespace"
+	ERROR_ALIAS_NOT_FOUND           = "Could not find alias for public key"
+	ERROR_ALIAS_TOO_LONG            = "Alias too long: %d max: %d"
+	ERROR_PUBLIC_KEY_NOT_FOUND      = "Could not find public key for alias"
 )
 
 func OpenAliasChannel() *bcgo.Channel {
@@ -52,6 +55,17 @@ func OpenAliasChannel() *bcgo.Channel {
 			&AliasValidator{},
 		},
 	}
+}
+
+func ValidateAlias(alias string) error {
+	if strings.IndexFunc(alias, unicode.IsSpace) != -1 {
+		return errors.New(ERROR_ALIAS_CONTAINS_WHITESPACE)
+	}
+	length := len(alias)
+	if length > MAX_ALIAS_LENGTH {
+		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+	}
+	return nil
 }
 
 func UniqueAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) error {
@@ -214,9 +228,8 @@ func (a *AliasValidator) Validate(channel *bcgo.Channel, cache bcgo.Cache, netwo
 			if err != nil {
 				return err
 			}
-			length := len(a.Alias)
-			if length > MAX_ALIAS_LENGTH {
-				return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+			if err := ValidateAlias(a.Alias); err != nil {
+				return err
 			}
 			v, exists := register[a.Alias]
 			if exists || v {
@@ -238,6 +251,9 @@ func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 	}
 	if err := aliases.Pull(node.Cache, node.Network); err != nil {
 		log.Println(err)
+	}
+	if err := ValidateAlias(node.Alias); err != nil {
+		return err
 	}
 	// Check Alias is unique
 	if err := UniqueAlias(aliases, node.Cache, node.Network, node.Alias); err != nil {
@@ -276,9 +292,8 @@ func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 }
 
 func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Record, error) {
-	length := len(alias)
-	if length > MAX_ALIAS_LENGTH {
-		return nil, errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+	if err := ValidateAlias(alias); err != nil {
+		return nil, err
 	}
 
 	publicKeyBytes, err := cryptogo.RSAPublicKeyToPKIXBytes(&privateKey.PublicKey)
@@ -306,9 +321,8 @@ func CreateSignedAliasRecord(alias string, privateKey *rsa.PrivateKey) (*bcgo.Re
 }
 
 func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat cryptogo.PublicKeyFormat, signature []byte, signatureAlgorithm cryptogo.SignatureAlgorithm) (*bcgo.Record, error) {
-	length := len(alias)
-	if length > MAX_ALIAS_LENGTH {
-		return nil, errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+	if err := ValidateAlias(alias); err != nil {
+		return nil, err
 	}
 
 	pubKey, err := cryptogo.ParseRSAPublicKey(publicKey, publicKeyFormat)
@@ -342,9 +356,8 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat cryptogo.
 }
 
 func RegisterAlias(host, alias string, key *rsa.PrivateKey) error {
-	length := len(alias)
-	if length > MAX_ALIAS_LENGTH {
-		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+	if err := ValidateAlias(alias); err != nil {
+		return err
 	}
 
 	publicKeyBytes, err := cryptogo.RSAPublicKeyToPKIXBytes(&key.PublicKey)
