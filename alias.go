@@ -69,7 +69,7 @@ func ValidateAlias(alias string) error {
 }
 
 func UniqueAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) error {
-	return bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+	return bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			if record.Creator == alias {
@@ -89,7 +89,7 @@ func UniqueAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, 
 
 func GetAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, publicKey *rsa.PublicKey) (*Alias, error) {
 	var result *Alias
-	if err := bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			a := &Alias{}
@@ -124,7 +124,7 @@ func GetAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, pub
 
 func GetPublicKey(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) (*rsa.PublicKey, error) {
 	var result *rsa.PublicKey
-	if err := bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			a := &Alias{}
@@ -160,7 +160,7 @@ func GetPublicKeys(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network
 	acl := make(map[string]*rsa.PublicKey)
 	if len(addresses) > 0 {
 		alias := &Alias{}
-		bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+		bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 			for _, entry := range block.Entry {
 				err := proto.Unmarshal(entry.Record.Payload, alias)
 				if err != nil {
@@ -185,7 +185,7 @@ func GetPublicKeys(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network
 func GetRecord(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) (*bcgo.Record, *Alias, error) {
 	var recordResult *bcgo.Record
 	var aliasResult *Alias
-	if err := bcgo.Iterate(channel.GetName(), channel.GetHead(), nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+	if err := bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			record := entry.Record
 			if record.Creator == alias {
@@ -219,7 +219,7 @@ type AliasValidator struct {
 
 func (a *AliasValidator) Validate(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, hash []byte, block *bcgo.Block) error {
 	register := make(map[string]bool)
-	return bcgo.Iterate(channel.GetName(), hash, block, cache, network, func(h []byte, b *bcgo.Block) error {
+	return bcgo.Iterate(channel.Name, hash, block, cache, network, func(h []byte, b *bcgo.Block) error {
 		for _, entry := range b.Entry {
 			record := entry.Record
 			// TODO Check record is public (no acl)
