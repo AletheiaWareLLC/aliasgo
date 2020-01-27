@@ -37,11 +37,13 @@ const (
 	ALIAS_THRESHOLD = bcgo.THRESHOLD_G
 
 	MAX_ALIAS_LENGTH = 100
+	MIN_ALIAS_LENGTH = 1
 
 	ERROR_ALIAS_ALREADY_REGISTERED  = "Alias already registered: %s"
 	ERROR_ALIAS_CONTAINS_WHITESPACE = "Alias contains whitespace"
 	ERROR_ALIAS_NOT_FOUND           = "Could not find alias for public key"
 	ERROR_ALIAS_TOO_LONG            = "Alias too long: %d max: %d"
+	ERROR_ALIAS_TOO_SHORT           = "Alias too short: %d min: %d"
 	ERROR_PUBLIC_KEY_NOT_FOUND      = "Could not find public key for alias"
 )
 
@@ -62,6 +64,9 @@ func ValidateAlias(alias string) error {
 		return errors.New(ERROR_ALIAS_CONTAINS_WHITESPACE)
 	}
 	length := len(alias)
+	if length < MIN_ALIAS_LENGTH {
+		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_SHORT, length, MIN_ALIAS_LENGTH))
+	}
 	if length > MAX_ALIAS_LENGTH {
 		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
 	}
