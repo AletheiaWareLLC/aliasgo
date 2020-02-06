@@ -39,12 +39,12 @@ const (
 	MAX_ALIAS_LENGTH = 100
 	MIN_ALIAS_LENGTH = 1
 
-	ERROR_ALIAS_ALREADY_REGISTERED  = "Alias already registered: %s"
-	ERROR_ALIAS_CONTAINS_WHITESPACE = "Alias contains whitespace"
-	ERROR_ALIAS_NOT_FOUND           = "Could not find alias for public key"
-	ERROR_ALIAS_TOO_LONG            = "Alias too long: %d max: %d"
-	ERROR_ALIAS_TOO_SHORT           = "Alias too short: %d min: %d"
-	ERROR_PUBLIC_KEY_NOT_FOUND      = "Could not find public key for alias"
+	ERROR_ALIAS_ALREADY_REGISTERED = "Alias already registered: %s"
+	ERROR_ALIAS_INVALID            = "Alias invalid: %s"
+	ERROR_ALIAS_NOT_FOUND          = "Could not find alias for public key"
+	ERROR_ALIAS_TOO_LONG           = "Alias too long: %d max: %d"
+	ERROR_ALIAS_TOO_SHORT          = "Alias too short: %d min: %d"
+	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could not find public key for alias"
 )
 
 func OpenAliasChannel() *bcgo.Channel {
@@ -59,9 +59,12 @@ func OpenAliasChannel() *bcgo.Channel {
 	}
 }
 
+// Validates alias is the correct length and all characters are in the set [a-zA-Z0-9.-_]
 func ValidateAlias(alias string) error {
-	if strings.IndexFunc(alias, unicode.IsSpace) != -1 {
-		return errors.New(ERROR_ALIAS_CONTAINS_WHITESPACE)
+	if strings.IndexFunc(alias, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '.' && r != '-' && r != '_'
+	}) != -1 {
+		return errors.New(fmt.Sprintf(ERROR_ALIAS_INVALID, alias))
 	}
 	length := len(alias)
 	if length < MIN_ALIAS_LENGTH {

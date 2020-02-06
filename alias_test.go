@@ -235,8 +235,14 @@ func TestAliasValidate(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
 		testinggo.AssertNoError(t, aliasgo.ValidateAlias("foobar"))
 	})
-	t.Run("NotValid", func(t *testing.T) {
-		testinggo.AssertError(t, aliasgo.ERROR_ALIAS_CONTAINS_WHITESPACE, aliasgo.ValidateAlias("foo bar"))
+	t.Run("NotValid_Space", func(t *testing.T) {
+		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_ALIAS_INVALID, "foo bar"), aliasgo.ValidateAlias("foo bar"))
+	})
+	t.Run("NotValid_Plus", func(t *testing.T) {
+		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_ALIAS_INVALID, "foo+bar"), aliasgo.ValidateAlias("foo+bar"))
+	})
+	t.Run("NotValid_Bracket", func(t *testing.T) {
+		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_ALIAS_INVALID, "foo()bar"), aliasgo.ValidateAlias("foo()bar"))
 	})
 }
 
