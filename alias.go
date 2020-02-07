@@ -243,7 +243,6 @@ func (a *AliasValidator) Validate(channel *bcgo.Channel, cache bcgo.Cache, netwo
 			if exists || v {
 				return errors.New(fmt.Sprintf(ERROR_ALIAS_ALREADY_REGISTERED, a.Alias))
 			}
-			fmt.Printf("Validated '%s'\n", a.Alias)
 			register[a.Alias] = true
 		}
 		return nil
@@ -278,18 +277,14 @@ func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 		}
 
 		// Write record to cache
-		reference, err := bcgo.WriteRecord(ALIAS, node.Cache, record)
-		if err != nil {
+		if _, err := bcgo.WriteRecord(ALIAS, node.Cache, record); err != nil {
 			return err
 		}
-		log.Println("Wrote Record", base64.RawURLEncoding.EncodeToString(reference.RecordHash))
 
 		// Mine record into blockchain
-		hash, _, err := node.Mine(aliases, ALIAS_THRESHOLD, listener)
-		if err != nil {
+		if _, _, err := node.Mine(aliases, ALIAS_THRESHOLD, listener); err != nil {
 			return err
 		}
-		log.Println("Mined Alias", base64.RawURLEncoding.EncodeToString(hash))
 
 		// Push update to peers
 		if err := aliases.Push(node.Cache, node.Network); err != nil {
