@@ -39,12 +39,12 @@ const (
 	MAX_ALIAS_LENGTH = 100
 	MIN_ALIAS_LENGTH = 1
 
-	ERROR_ALIAS_ALREADY_REGISTERED = "Alias already registered: %s"
-	ERROR_ALIAS_INVALID            = "Alias invalid: %s"
-	ERROR_ALIAS_NOT_FOUND          = "Could not find alias for public key"
-	ERROR_ALIAS_TOO_LONG           = "Alias too long: %d max: %d"
-	ERROR_ALIAS_TOO_SHORT          = "Alias too short: %d min: %d"
-	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could not find public key for alias"
+	ERROR_ALIAS_ALREADY_REGISTERED = "Alias Already Registered: %s"
+	ERROR_ALIAS_INVALID            = "Alias Invalid: %s"
+	ERROR_ALIAS_NOT_FOUND          = "Could Not Find Alias For Public Key"
+	ERROR_ALIAS_TOO_LONG           = "Alias Too Long: %d Maximum: %d"
+	ERROR_ALIAS_TOO_SHORT          = "Alias Too Short: %d Minimum: %d"
+	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could Not Find Public Key For Alias"
 )
 
 func OpenAliasChannel() *bcgo.Channel {
