@@ -95,6 +95,23 @@ func UniqueAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, 
 	})
 }
 
+func IterateAliases(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, callback func(*Alias) error) error {
+	return bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
+		for _, entry := range block.Entry {
+			alias := &Alias{}
+			err := proto.Unmarshal(entry.Record.Payload, alias)
+			if err != nil {
+				return err
+			}
+			err = callback(alias)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func GetAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, publicKey *rsa.PublicKey) (*Alias, error) {
 	var result *Alias
 	if err := bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
