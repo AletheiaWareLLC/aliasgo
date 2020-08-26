@@ -269,11 +269,7 @@ func (a *AliasValidator) Validate(channel *bcgo.Channel, cache bcgo.Cache, netwo
 func Register(node *bcgo.Node, listener bcgo.MiningListener) error {
 	// Open Alias Channel
 	aliases := OpenAliasChannel()
-	// Update Alias Channel
-	if err := aliases.LoadCachedHead(node.Cache); err != nil {
-		log.Println(err)
-	}
-	if err := aliases.Pull(node.Cache, node.Network); err != nil {
+	if err := aliases.Refresh(node.Cache, node.Network); err != nil {
 		log.Println(err)
 	}
 	if err := ValidateAlias(node.Alias); err != nil {
