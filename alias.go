@@ -95,7 +95,7 @@ func UniqueAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, 
 	})
 }
 
-func IterateAliases(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, callback func(*Alias) error) error {
+func IterateAliases(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, callback func(*bcgo.BlockEntry, *Alias) error) error {
 	return bcgo.Iterate(channel.Name, channel.Head, nil, cache, network, func(hash []byte, block *bcgo.Block) error {
 		for _, entry := range block.Entry {
 			alias := &Alias{}
@@ -103,7 +103,7 @@ func IterateAliases(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Networ
 			if err != nil {
 				return err
 			}
-			err = callback(alias)
+			err = callback(entry, alias)
 			if err != nil {
 				return err
 			}
