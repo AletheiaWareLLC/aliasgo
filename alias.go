@@ -64,14 +64,14 @@ func ValidateAlias(alias string) error {
 	if strings.IndexFunc(alias, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '.' && r != '-' && r != '_'
 	}) != -1 {
-		return errors.New(fmt.Sprintf(ERROR_ALIAS_INVALID, alias))
+		return fmt.Errorf(ERROR_ALIAS_INVALID, alias)
 	}
 	length := len(alias)
 	if length < MIN_ALIAS_LENGTH {
-		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_SHORT, length, MIN_ALIAS_LENGTH))
+		return fmt.Errorf(ERROR_ALIAS_TOO_SHORT, length, MIN_ALIAS_LENGTH)
 	}
 	if length > MAX_ALIAS_LENGTH {
-		return errors.New(fmt.Sprintf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH))
+		return fmt.Errorf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH)
 	}
 	return nil
 }
@@ -87,7 +87,7 @@ func UniqueAlias(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, 
 					return err
 				}
 				if a.Alias == alias {
-					return errors.New(fmt.Sprintf(ERROR_ALIAS_ALREADY_REGISTERED, alias))
+					return fmt.Errorf(ERROR_ALIAS_ALREADY_REGISTERED, alias)
 				}
 			}
 		}
@@ -258,7 +258,7 @@ func (a *AliasValidator) Validate(channel *bcgo.Channel, cache bcgo.Cache, netwo
 			}
 			v, exists := register[a.Alias]
 			if exists || v {
-				return errors.New(fmt.Sprintf(ERROR_ALIAS_ALREADY_REGISTERED, a.Alias))
+				return fmt.Errorf(ERROR_ALIAS_ALREADY_REGISTERED, a.Alias)
 			}
 			register[a.Alias] = true
 		}
@@ -411,6 +411,6 @@ func RegisterAlias(host, alias string, key *rsa.PrivateKey) error {
 	case http.StatusOK:
 		return nil
 	default:
-		return errors.New("Registration status: " + response.Status)
+		return fmt.Errorf("Registration status: %s", response.Status)
 	}
 }
