@@ -27,6 +27,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"unicode"
 )
@@ -51,6 +52,7 @@ func OpenAliasChannel() *bcgo.Channel {
 	return &bcgo.Channel{
 		Name: ALIAS,
 		Validators: []bcgo.Validator{
+			&bcgo.LiveValidator{},
 			&bcgo.PoWValidator{
 				Threshold: ALIAS_THRESHOLD,
 			},
@@ -367,6 +369,11 @@ func CreateAliasRecord(alias string, publicKey []byte, publicKeyFormat cryptogo.
 		EncryptionAlgorithm: cryptogo.EncryptionAlgorithm_UNKNOWN_ENCRYPTION,
 		Signature:           signature,
 		SignatureAlgorithm:  signatureAlgorithm,
+	}
+	if l, ok := os.LookupEnv(bcgo.LIVE_FLAG); ok {
+		record.Meta = map[string]string{
+			bcgo.LIVE_FLAG: l,
+		}
 	}
 	return record, nil
 }
