@@ -1,9 +1,9 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-github.com/AletheiaWareLLC/bcgo v1.0.1 h1:7Q+re45Qg7R2bEysTcy1ykrYbJssNmiKePjyDI5QSR8=
-github.com/AletheiaWareLLC/bcgo v1.0.1/go.mod h1:lSvGTkmUVYicsaX61D/LYJ9dbGqwLDw6TQRMm2hKdnk=
+github.com/AletheiaWareLLC/bcgo v1.0.2 h1:4h5pIuwsuB6u8w4wwHfVQZek+rLtYjkSGMGDOiLm1Tg=
+github.com/AletheiaWareLLC/bcgo v1.0.2/go.mod h1:qaL0GE23/rbpLIrDjWKFkiOXLm5Ev5Kw+c1yjYXClh4=
 github.com/AletheiaWareLLC/cryptogo v0.0.0-20201214162128-3e897372ea55/go.mod h1:8FSMWc3O8I3nprn9LYqYGZhZHaAW3OUF3bjvIDngbkU=
-github.com/AletheiaWareLLC/cryptogo v1.0.0 h1:ClrvZ36qsdzH7qcPYFmFSLRwuPz+kas4gzXHTf2YZLc=
-github.com/AletheiaWareLLC/cryptogo v1.0.0/go.mod h1:8FSMWc3O8I3nprn9LYqYGZhZHaAW3OUF3bjvIDngbkU=
+github.com/AletheiaWareLLC/cryptogo v1.0.1 h1:/p/6jhm5aQ8wK34ri/SEKDoKW5bJBhCM/aA84wsusD4=
+github.com/AletheiaWareLLC/cryptogo v1.0.1/go.mod h1:8FSMWc3O8I3nprn9LYqYGZhZHaAW3OUF3bjvIDngbkU=
 github.com/AletheiaWareLLC/testinggo v1.0.0 h1:MPsdpyWIsQoM2exX9EljHzN9SB0hUkO6M5Pl4Pp9otI=
 github.com/AletheiaWareLLC/testinggo v1.0.0/go.mod h1:6aH2ltFhpScQJjeDrpCoDTCHFZGACcLLcptbppFoyVM=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
