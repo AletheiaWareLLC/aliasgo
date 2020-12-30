@@ -4,8 +4,8 @@
 package aliasgo
 
 import (
+	cryptogo "aletheiaware.com/cryptogo"
 	fmt "fmt"
-	cryptogo "github.com/AletheiaWareLLC/cryptogo"
 	proto "github.com/golang/protobuf/proto"
 	math "math"
 )

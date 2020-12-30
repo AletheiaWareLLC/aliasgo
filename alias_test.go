@@ -17,14 +17,14 @@
 package aliasgo_test
 
 import (
+	"aletheiaware.com/aliasgo"
+	"aletheiaware.com/bcgo"
+	"aletheiaware.com/cryptogo"
+	"aletheiaware.com/testinggo"
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"github.com/AletheiaWareLLC/aliasgo"
-	"github.com/AletheiaWareLLC/bcgo"
-	"github.com/AletheiaWareLLC/cryptogo"
-	"github.com/AletheiaWareLLC/testinggo"
 	"testing"
 )
 

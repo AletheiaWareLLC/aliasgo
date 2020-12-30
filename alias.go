@@ -17,12 +17,12 @@
 package aliasgo
 
 import (
+	"aletheiaware.com/bcgo"
+	"aletheiaware.com/cryptogo"
 	"crypto/rsa"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/AletheiaWareLLC/bcgo"
-	"github.com/AletheiaWareLLC/cryptogo"
 	"github.com/golang/protobuf/proto"
 	"log"
 	"net/http"
