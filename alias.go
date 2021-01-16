@@ -43,6 +43,7 @@ const (
 	ERROR_ALIAS_ALREADY_REGISTERED = "Alias Already Registered: %s"
 	ERROR_ALIAS_INVALID            = "Alias Invalid: %s"
 	ERROR_ALIAS_NOT_FOUND          = "Could Not Find Alias For Public Key"
+	ERROR_ALIAS_NOT_PUBLIC         = "Cannot Register Private Alias"
 	ERROR_ALIAS_TOO_LONG           = "Alias Too Long: %d Maximum: %d"
 	ERROR_ALIAS_TOO_SHORT          = "Alias Too Short: %d Minimum: %d"
 	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could Not Find Public Key For Alias"
@@ -249,7 +250,9 @@ func (a *AliasValidator) Validate(channel *bcgo.Channel, cache bcgo.Cache, netwo
 	return bcgo.Iterate(channel.Name, hash, block, cache, network, func(h []byte, b *bcgo.Block) error {
 		for _, entry := range b.Entry {
 			record := entry.Record
-			// TODO Check record is public (no acl)
+			if len(record.Access) != 0 {
+				return fmt.Errorf(ERROR_ALIAS_NOT_PUBLIC)
+			}
 			a := &Alias{}
 			err := proto.Unmarshal(record.Payload, a)
 			if err != nil {
