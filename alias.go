@@ -210,6 +210,21 @@ func GetPublicKeys(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network
 	return acl
 }
 
+func AllPublicKeys(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network) (map[string]*rsa.PublicKey, error) {
+	aliases := make(map[string]*rsa.PublicKey)
+	if err := IterateAliases(channel, cache, network, func(e *bcgo.BlockEntry, a *Alias) error {
+		key, err := cryptogo.ParseRSAPublicKey(a.PublicKey, a.PublicFormat)
+		if err != nil {
+			return err
+		}
+		aliases[a.Alias] = key
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return aliases, nil
+}
+
 func GetRecord(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias string) (*bcgo.Record, *Alias, error) {
 	var recordResult *bcgo.Record
 	var aliasResult *Alias
