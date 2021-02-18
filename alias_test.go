@@ -153,9 +153,7 @@ func TestAliasGetPublicKey(t *testing.T) {
 		cache := bcgo.NewMemoryCache(1)
 		channel := aliasgo.OpenAliasChannel()
 		_, err := aliasgo.GetPublicKey(channel, cache, nil, "Alice")
-		if err == nil || err.Error() != aliasgo.ERROR_PUBLIC_KEY_NOT_FOUND {
-			t.Fatalf("Expected error, got '%s'", err)
-		}
+		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_PUBLIC_KEY_NOT_FOUND, "Alice"), err)
 	})
 }
 

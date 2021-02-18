@@ -46,7 +46,7 @@ const (
 	ERROR_ALIAS_NOT_PUBLIC         = "Cannot Register Private Alias"
 	ERROR_ALIAS_TOO_LONG           = "Alias Too Long: %d Maximum: %d"
 	ERROR_ALIAS_TOO_SHORT          = "Alias Too Short: %d Minimum: %d"
-	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could Not Find Public Key For Alias"
+	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could Not Find Public Key For Alias: %s"
 )
 
 func OpenAliasChannel() *bcgo.Channel {
@@ -179,7 +179,7 @@ func GetPublicKey(channel *bcgo.Channel, cache bcgo.Cache, network bcgo.Network,
 		}
 	}
 	if result == nil {
-		return nil, errors.New(ERROR_PUBLIC_KEY_NOT_FOUND)
+		return nil, fmt.Errorf(ERROR_PUBLIC_KEY_NOT_FOUND, alias)
 	}
 	return result, nil
 }
