@@ -19,6 +19,9 @@ package aliasgo_test
 import (
 	"aletheiaware.com/aliasgo"
 	"aletheiaware.com/bcgo"
+	"aletheiaware.com/bcgo/account"
+	"aletheiaware.com/bcgo/cache"
+	"aletheiaware.com/bcgo/channel"
 	"aletheiaware.com/cryptogo"
 	"aletheiaware.com/testinggo"
 	"bytes"
@@ -35,7 +38,9 @@ func makeAlias(t *testing.T, cache bcgo.Cache, alias string, previousHash []byte
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	testinggo.AssertNoError(t, err)
 
-	record, err := aliasgo.CreateSignedAliasRecord(alias, privateKey)
+	account := account.NewRSA(alias, privateKey)
+
+	record, err := aliasgo.CreateSignedAliasRecord(account)
 	testinggo.AssertNoError(t, err)
 
 	recordHash, err := cryptogo.HashProtobuf(record)
@@ -76,17 +81,17 @@ func makeAlias(t *testing.T, cache bcgo.Cache, alias string, previousHash []byte
 
 func TestAliasUnique(t *testing.T) {
 	t.Run("Unique", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		channel := aliasgo.OpenAliasChannel()
 		if err := aliasgo.UniqueAlias(channel, cache, nil, "Alice"); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
 	})
 	t.Run("NotUnique", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAliasChannel()
-		if err := channel.LoadHead(cache, nil); err != nil {
+		if err := channel.Load(cache, nil); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
 		if err := aliasgo.UniqueAlias(channel, cache, nil, "Alice"); err == nil || err.Error() != fmt.Sprintf(aliasgo.ERROR_ALIAS_ALREADY_REGISTERED, "Alice") {
@@ -95,15 +100,15 @@ func TestAliasUnique(t *testing.T) {
 	})
 }
 
-func TestAliasGetAlias(t *testing.T) {
+func TestAliasAlias(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		aliceKey, _, _, _ := makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAliasChannel()
-		if err := channel.LoadHead(cache, nil); err != nil {
+		if err := channel.Load(cache, nil); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		alias, err := aliasgo.GetAlias(channel, cache, nil, &aliceKey.PublicKey)
+		alias, err := aliasgo.AliasForKey(channel, cache, nil, &aliceKey.PublicKey)
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
@@ -112,28 +117,28 @@ func TestAliasGetAlias(t *testing.T) {
 		}
 	})
 	t.Run("NotExists", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		channel := aliasgo.OpenAliasChannel()
 		privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
 			t.Fatalf("Could not get private key: '%s'", err)
 		}
-		_, err = aliasgo.GetAlias(channel, cache, nil, &privateKey.PublicKey)
+		_, err = aliasgo.AliasForKey(channel, cache, nil, &privateKey.PublicKey)
 		if err == nil || err.Error() != aliasgo.ERROR_ALIAS_NOT_FOUND {
 			t.Fatalf("Expected error, got '%s'", err)
 		}
 	})
 }
 
-func TestAliasGetPublicKey(t *testing.T) {
+func TestAliasPublicKey(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		aliceKey, _, _, _ := makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAliasChannel()
-		if err := channel.LoadHead(cache, nil); err != nil {
+		if err := channel.Load(cache, nil); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		key, err := aliasgo.GetPublicKey(channel, cache, nil, "Alice")
+		key, err := aliasgo.PublicKeyForAlias(channel, cache, nil, "Alice")
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
@@ -150,22 +155,22 @@ func TestAliasGetPublicKey(t *testing.T) {
 		}
 	})
 	t.Run("NotExists", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		channel := aliasgo.OpenAliasChannel()
-		_, err := aliasgo.GetPublicKey(channel, cache, nil, "Alice")
+		_, err := aliasgo.PublicKeyForAlias(channel, cache, nil, "Alice")
 		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_PUBLIC_KEY_NOT_FOUND, "Alice"), err)
 	})
 }
 
-func TestAliasGetAliasRecord(t *testing.T) {
+func TestAliasAliasRecord(t *testing.T) {
 	t.Run("Exists", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		aliceKey, _, _, aliceRecord := makeAlias(t, cache, "Alice", nil, nil)
 		channel := aliasgo.OpenAliasChannel()
-		if err := channel.LoadHead(cache, nil); err != nil {
+		if err := channel.Load(cache, nil); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		record, alias, err := aliasgo.GetRecord(channel, cache, nil, "Alice")
+		record, alias, err := aliasgo.Record(channel, cache, nil, "Alice")
 		if err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
@@ -181,9 +186,9 @@ func TestAliasGetAliasRecord(t *testing.T) {
 		}
 	})
 	t.Run("NotExists", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		channel := aliasgo.OpenAliasChannel()
-		_, _, err := aliasgo.GetRecord(channel, cache, nil, "Alice")
+		_, _, err := aliasgo.Record(channel, cache, nil, "Alice")
 		if err == nil || err.Error() != aliasgo.ERROR_ALIAS_NOT_FOUND {
 			t.Fatalf("Expected error, got '%s'", err)
 		}
@@ -192,13 +197,11 @@ func TestAliasGetAliasRecord(t *testing.T) {
 
 func TestAliasValidator(t *testing.T) {
 	t.Run("Valid", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		_, aliceHash, aliceBlock, _ := makeAlias(t, cache, "Alice", nil, nil)
 		_, bobHash, bobBlock, _ := makeAlias(t, cache, "Bob", aliceHash, aliceBlock)
-		channel := &bcgo.Channel{
-			Name: aliasgo.ALIAS,
-		}
-		if err := channel.LoadHead(cache, nil); err != nil {
+		channel := channel.New(aliasgo.ALIAS)
+		if err := channel.Load(cache, nil); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
 		validator := &aliasgo.AliasValidator{}
@@ -210,13 +213,11 @@ func TestAliasValidator(t *testing.T) {
 		}
 	})
 	t.Run("NotValid", func(t *testing.T) {
-		cache := bcgo.NewMemoryCache(1)
+		cache := cache.NewMemory(1)
 		_, aliceHash1, aliceBlock1, _ := makeAlias(t, cache, "Alice", nil, nil)
 		_, aliceHash2, aliceBlock2, _ := makeAlias(t, cache, "Alice", aliceHash1, aliceBlock1)
-		channel := &bcgo.Channel{
-			Name: aliasgo.ALIAS,
-		}
-		if err := channel.LoadHead(cache, nil); err != nil {
+		channel := channel.New(aliasgo.ALIAS)
+		if err := channel.Load(cache, nil); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
 		validator := &aliasgo.AliasValidator{}
