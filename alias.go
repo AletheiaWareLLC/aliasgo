@@ -24,7 +24,6 @@ import (
 	"aletheiaware.com/cryptogo"
 	"crypto/rsa"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"log"
@@ -42,14 +41,6 @@ const (
 
 	MAX_ALIAS_LENGTH = 100
 	MIN_ALIAS_LENGTH = 1
-
-	ERROR_ALIAS_ALREADY_REGISTERED = "Alias Already Registered: %s"
-	ERROR_ALIAS_INVALID            = "Alias Invalid: %s"
-	ERROR_ALIAS_NOT_FOUND          = "Could Not Find Alias For Public Key"
-	ERROR_ALIAS_NOT_PUBLIC         = "Cannot Register Private Alias"
-	ERROR_ALIAS_TOO_LONG           = "Alias Too Long: %d Maximum: %d"
-	ERROR_ALIAS_TOO_SHORT          = "Alias Too Short: %d Minimum: %d"
-	ERROR_PUBLIC_KEY_NOT_FOUND     = "Could Not Find Public Key For Alias: %s"
 )
 
 func OpenAliasChannel() bcgo.Channel {
@@ -65,14 +56,14 @@ func ValidateAlias(alias string) error {
 	if strings.IndexFunc(alias, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '.' && r != '-' && r != '_'
 	}) != -1 {
-		return fmt.Errorf(ERROR_ALIAS_INVALID, alias)
+		return ErrAliasInvalid{Alias: alias}
 	}
 	length := len(alias)
 	if length < MIN_ALIAS_LENGTH {
-		return fmt.Errorf(ERROR_ALIAS_TOO_SHORT, length, MIN_ALIAS_LENGTH)
+		return ErrAliasTooShort{Size: length, Min: MIN_ALIAS_LENGTH}
 	}
 	if length > MAX_ALIAS_LENGTH {
-		return fmt.Errorf(ERROR_ALIAS_TOO_LONG, length, MAX_ALIAS_LENGTH)
+		return ErrAliasTooLong{Size: length, Max: MAX_ALIAS_LENGTH}
 	}
 	return nil
 }
@@ -88,7 +79,7 @@ func UniqueAlias(channel bcgo.Channel, cache bcgo.Cache, network bcgo.Network, a
 					return err
 				}
 				if a.Alias == alias {
-					return fmt.Errorf(ERROR_ALIAS_ALREADY_REGISTERED, alias)
+					return ErrAliasAlreadyRegistered{Alias: alias}
 				}
 			}
 		}
@@ -129,13 +120,13 @@ func AliasForKey(channel bcgo.Channel, cache bcgo.Cache, network bcgo.Network, p
 			}
 			if publicKey.N.Cmp(pk.N) == 0 && publicKey.E == pk.E {
 				result = a
-				return bcgo.StopIterationError{}
+				return bcgo.ErrStopIteration{}
 			}
 		}
 		return nil
 	}); err != nil {
 		switch err.(type) {
-		case bcgo.StopIterationError:
+		case bcgo.ErrStopIteration:
 			// Do nothing
 			break
 		default:
@@ -143,7 +134,7 @@ func AliasForKey(channel bcgo.Channel, cache bcgo.Cache, network bcgo.Network, p
 		}
 	}
 	if result == nil {
-		return nil, errors.New(ERROR_ALIAS_NOT_FOUND)
+		return nil, ErrAliasNotFound{}
 	}
 	return result, nil
 }
@@ -163,13 +154,13 @@ func PublicKeyForAlias(channel bcgo.Channel, cache bcgo.Cache, network bcgo.Netw
 				if err != nil {
 					return err
 				}
-				return bcgo.StopIterationError{}
+				return bcgo.ErrStopIteration{}
 			}
 		}
 		return nil
 	}); err != nil {
 		switch err.(type) {
-		case bcgo.StopIterationError:
+		case bcgo.ErrStopIteration:
 			// Do nothing
 			break
 		default:
@@ -177,7 +168,7 @@ func PublicKeyForAlias(channel bcgo.Channel, cache bcgo.Cache, network bcgo.Netw
 		}
 	}
 	if result == nil {
-		return nil, fmt.Errorf(ERROR_PUBLIC_KEY_NOT_FOUND, alias)
+		return nil, ErrPublicKeyNotFound{Alias: alias}
 	}
 	return result, nil
 }
@@ -235,13 +226,13 @@ func Record(channel bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias 
 				if err != nil {
 					return err
 				}
-				return bcgo.StopIterationError{}
+				return bcgo.ErrStopIteration{}
 			}
 		}
 		return nil
 	}); err != nil {
 		switch err.(type) {
-		case bcgo.StopIterationError:
+		case bcgo.ErrStopIteration:
 			// Do nothing
 			break
 		default:
@@ -249,7 +240,7 @@ func Record(channel bcgo.Channel, cache bcgo.Cache, network bcgo.Network, alias 
 		}
 	}
 	if recordResult == nil || aliasResult == nil {
-		return nil, nil, errors.New(ERROR_ALIAS_NOT_FOUND)
+		return nil, nil, ErrAliasNotFound{}
 	}
 	return recordResult, aliasResult, nil
 }
@@ -263,7 +254,7 @@ func (a *AliasValidator) Validate(channel bcgo.Channel, cache bcgo.Cache, networ
 		for _, entry := range b.Entry {
 			record := entry.Record
 			if len(record.Access) != 0 {
-				return fmt.Errorf(ERROR_ALIAS_NOT_PUBLIC)
+				return ErrAliasNotPublic{}
 			}
 			a := &Alias{}
 			err := proto.Unmarshal(record.Payload, a)
@@ -275,7 +266,7 @@ func (a *AliasValidator) Validate(channel bcgo.Channel, cache bcgo.Cache, networ
 			}
 			v, exists := register[a.Alias]
 			if exists || v {
-				return fmt.Errorf(ERROR_ALIAS_ALREADY_REGISTERED, a.Alias)
+				return ErrAliasAlreadyRegistered{Alias: a.Alias}
 			}
 			register[a.Alias] = true
 		}

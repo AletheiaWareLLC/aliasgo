@@ -27,7 +27,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
-	"fmt"
 	"testing"
 )
 
@@ -94,9 +93,8 @@ func TestAliasUnique(t *testing.T) {
 		if err := channel.Load(cache, nil); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		if err := aliasgo.UniqueAlias(channel, cache, nil, "Alice"); err == nil || err.Error() != fmt.Sprintf(aliasgo.ERROR_ALIAS_ALREADY_REGISTERED, "Alice") {
-			t.Fatalf("Expected error, got '%s'", err)
-		}
+		err := aliasgo.UniqueAlias(channel, cache, nil, "Alice")
+		testinggo.AssertError(t, aliasgo.ErrAliasAlreadyRegistered{Alias: "Alice"}.Error(), err)
 	})
 }
 
@@ -124,9 +122,7 @@ func TestAliasAlias(t *testing.T) {
 			t.Fatalf("Could not get private key: '%s'", err)
 		}
 		_, err = aliasgo.AliasForKey(channel, cache, nil, &privateKey.PublicKey)
-		if err == nil || err.Error() != aliasgo.ERROR_ALIAS_NOT_FOUND {
-			t.Fatalf("Expected error, got '%s'", err)
-		}
+		testinggo.AssertError(t, aliasgo.ErrAliasNotFound{}.Error(), err)
 	})
 }
 
@@ -158,7 +154,7 @@ func TestAliasPublicKey(t *testing.T) {
 		cache := cache.NewMemory(1)
 		channel := aliasgo.OpenAliasChannel()
 		_, err := aliasgo.PublicKeyForAlias(channel, cache, nil, "Alice")
-		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_PUBLIC_KEY_NOT_FOUND, "Alice"), err)
+		testinggo.AssertError(t, aliasgo.ErrPublicKeyNotFound{Alias: "Alice"}.Error(), err)
 	})
 }
 
@@ -189,9 +185,7 @@ func TestAliasAliasRecord(t *testing.T) {
 		cache := cache.NewMemory(1)
 		channel := aliasgo.OpenAliasChannel()
 		_, _, err := aliasgo.Record(channel, cache, nil, "Alice")
-		if err == nil || err.Error() != aliasgo.ERROR_ALIAS_NOT_FOUND {
-			t.Fatalf("Expected error, got '%s'", err)
-		}
+		testinggo.AssertError(t, aliasgo.ErrAliasNotFound{}.Error(), err)
 	})
 }
 
@@ -224,9 +218,8 @@ func TestAliasValidator(t *testing.T) {
 		if err := validator.Validate(channel, cache, nil, aliceHash1, aliceBlock1); err != nil {
 			t.Fatalf("Expected no error, got '%s'", err)
 		}
-		if err := validator.Validate(channel, cache, nil, aliceHash2, aliceBlock2); err == nil || err.Error() != fmt.Sprintf(aliasgo.ERROR_ALIAS_ALREADY_REGISTERED, "Alice") {
-			t.Fatalf("Expected error, got '%s'", err)
-		}
+		err := validator.Validate(channel, cache, nil, aliceHash2, aliceBlock2)
+		testinggo.AssertError(t, aliasgo.ErrAliasAlreadyRegistered{Alias: "Alice"}.Error(), err)
 	})
 }
 
@@ -235,13 +228,13 @@ func TestAliasValidate(t *testing.T) {
 		testinggo.AssertNoError(t, aliasgo.ValidateAlias("foobar"))
 	})
 	t.Run("NotValid_Space", func(t *testing.T) {
-		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_ALIAS_INVALID, "foo bar"), aliasgo.ValidateAlias("foo bar"))
+		testinggo.AssertError(t, aliasgo.ErrAliasInvalid{Alias: "foo bar"}.Error(), aliasgo.ValidateAlias("foo bar"))
 	})
 	t.Run("NotValid_Plus", func(t *testing.T) {
-		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_ALIAS_INVALID, "foo+bar"), aliasgo.ValidateAlias("foo+bar"))
+		testinggo.AssertError(t, aliasgo.ErrAliasInvalid{Alias: "foo+bar"}.Error(), aliasgo.ValidateAlias("foo+bar"))
 	})
 	t.Run("NotValid_Bracket", func(t *testing.T) {
-		testinggo.AssertError(t, fmt.Sprintf(aliasgo.ERROR_ALIAS_INVALID, "foo()bar"), aliasgo.ValidateAlias("foo()bar"))
+		testinggo.AssertError(t, aliasgo.ErrAliasInvalid{Alias: "foo()bar"}.Error(), aliasgo.ValidateAlias("foo()bar"))
 	})
 }
 
