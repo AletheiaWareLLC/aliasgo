@@ -46,6 +46,7 @@ func makeAlias(t *testing.T, cache bcgo.Cache, alias string, previousHash []byte
 	testinggo.AssertNoError(t, err)
 
 	block := &bcgo.Block{
+		Timestamp: 1,
 		Entry: []*bcgo.BlockEntry{
 			&bcgo.BlockEntry{
 				Record:     record,
@@ -65,6 +66,7 @@ func makeAlias(t *testing.T, cache bcgo.Cache, alias string, previousHash []byte
 	testinggo.AssertNoError(t, err)
 
 	headReference := &bcgo.Reference{
+		Timestamp:   1,
 		ChannelName: aliasgo.ALIAS,
 		BlockHash:   blockHash,
 	}
